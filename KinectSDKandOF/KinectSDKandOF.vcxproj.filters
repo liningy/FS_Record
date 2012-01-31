@@ -47,6 +47,12 @@
     <ClCompile Include="testApp.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="ofxKinectPlayer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="ofxKinectRecorder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\addons\ofxFBOTexture.h">
@@ -74,6 +80,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="grabVideo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ofxKinectPlayer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ofxKinectRecorder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ofxBase3DVideo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
