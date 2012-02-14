@@ -20,10 +20,7 @@ public:
 	/// set video to true to enable the video (infrared/RGB) image
 	/// make sure you recorded the video frames or reading them will fail big time!
 	void setup(const string & file, bool video=false);
-	//pair <unsigned char *,unsigned char *> updatea();
-	pair<unsigned char *,pair<unsigned char *,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,int>>>>>>>>>>>> updatea();
-	//pair<unsigned char *, pair <unsigned char *,int>> updatea();
-	//pair<unsigned char *, unsigned char *> updatea();
+	pair<unsigned char *,pair<unsigned char *,pair<time_t,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,bool>>>>>>>>>>>>>> updatea(bool updateDelay = true);
 	void update();
 	void draw(float x, float y);
 	void draw(float , float y, float w, float h);
@@ -74,7 +71,6 @@ public:
 private:
 	FILE * f;
 	string filename;
-	//unsigned short *buf;
 	unsigned char *buf;
 	ofTexture depthTex,videoTex;
 	bool bUseTexture;
@@ -88,7 +84,8 @@ private:
 	int lastFrameTime;
 	int headx, heady, headz;
 	int leftshoulderx, leftshouldery, rightshoulderx, rightshouldery, lefthandx, lefthandy, righthandx, righthandy;
-
+	bool righthandraised;
+	time_t rawTime;
 	//ofxKinectCalibration calibration;
 };
 

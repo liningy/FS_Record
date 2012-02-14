@@ -18,7 +18,7 @@ ofxKinectPlayer::ofxKinectPlayer(){
 	buf = 0;
 	rgb = 0;
 	bUseTexture = true;
-	fps = 30;
+	fps = 30;//ka was 30
 }
 
 //-----------------------------------------------------------
@@ -59,17 +59,20 @@ void ofxKinectPlayer::setup(const string & file, bool video){
 //-----------------------------------------------------------
 void ofxKinectPlayer::update(){
 }
-pair<unsigned char *,pair<unsigned char *,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,int>>>>>>>>>>>> ofxKinectPlayer::updatea(){
+pair<unsigned char *,pair<unsigned char *,pair<time_t,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,bool>>>>>>>>>>>>>> ofxKinectPlayer::updatea(bool updateDelay){
 	if(!f){
 		printf("error!");
 	}
-	while((ofGetElapsedTimeMillis()-lastFrameTime)<(1000./float(fps)))	
-	{}
+	if (updateDelay){
+		while((ofGetElapsedTimeMillis()-lastFrameTime)<(1000./float(fps)))	
+		{}
+	}
 	lastFrameTime = ofGetElapsedTimeMillis();
 	if(bVideo)
 		fread(rgb,640*480*4,1,f);
 	fread(buf,640*480*4,1,f);
 
+	fread(&rawTime,sizeof(time_t),1,f);
 	fread(&headx,sizeof(int),1,f);
 	fread(&heady,sizeof(int),1,f);
 	fread(&headz,sizeof(int),1,f);
@@ -81,7 +84,7 @@ pair<unsigned char *,pair<unsigned char *,pair<int,pair<int,pair<int,pair<int,pa
 	fread(&lefthandy,sizeof(int),1,f);
 	fread(&righthandx,sizeof(int),1,f);
 	fread(&righthandy,sizeof(int),1,f);
-
+	fread(&righthandraised,sizeof(bool),1,f);
 	// loop?
 	if(bLoop && std::feof(f) > 0) {
 		f = fopen(ofToDataPath(filename).c_str(), "rb");
@@ -91,12 +94,11 @@ pair<unsigned char *,pair<unsigned char *,pair<int,pair<int,pair<int,pair<int,pa
 	if(bUseTexture){
 		//depthTex.loadData(calibration.getDepthPixels(),640,480,GL_LUMINANCE);
 		//videoTex.loadData(rgb,640,480,GL_RGB);
-		return make_pair(rgb,make_pair(buf,make_pair(headx,make_pair(heady,make_pair(headz,make_pair(leftshoulderx,make_pair(leftshouldery,make_pair(rightshoulderx,make_pair(rightshouldery,make_pair(lefthandx,make_pair(lefthandy,make_pair(righthandx,righthandy))))))))))));
+	  return make_pair(rgb,make_pair(buf,make_pair(rawTime,make_pair(headx,make_pair(heady,make_pair(headz,make_pair(leftshoulderx,make_pair(leftshouldery,make_pair(rightshoulderx,make_pair(rightshouldery,make_pair(lefthandx,make_pair(lefthandy,make_pair(righthandx,make_pair(righthandy,righthandraised))))))))))))));
 	}
 	printf("error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-	return make_pair(rgb,make_pair(buf,make_pair(headx,make_pair(heady,make_pair(headz,make_pair(leftshoulderx,make_pair(leftshouldery,make_pair(rightshoulderx,make_pair(rightshouldery,make_pair(lefthandx,make_pair(lefthandy,make_pair(righthandx,righthandy))))))))))));
+	return make_pair(rgb,make_pair(buf,make_pair(rawTime,make_pair(headx,make_pair(heady,make_pair(headz,make_pair(leftshoulderx,make_pair(leftshouldery,make_pair(rightshoulderx,make_pair(rightshouldery,make_pair(lefthandx,make_pair(lefthandy,make_pair(righthandx,make_pair(righthandy,righthandraised))))))))))))));
 }
-
 //-----------------------------------------------------------
 void ofxKinectPlayer::draw(float x, float y){
 	if(bUseTexture) {

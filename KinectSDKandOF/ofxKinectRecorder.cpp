@@ -20,7 +20,7 @@ void ofxKinectRecorder::init(const string & filename){
 	f = fopen(ofToDataPath(filename).c_str(),"wb");
 }
 
-void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, int headx, int heady, int headz, int leftshoulderx, int leftshouldery, int rightshoulderx, int rightshouldery, int lefthandx, int lefthandy, int righthandx, int righthandy) {
+void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, time_t rawtime, int headx, int heady, int headz, int leftshoulderx, int leftshouldery, int rightshoulderx, int rightshouldery, int lefthandx, int lefthandy, int righthandx, int righthandy, bool righthandraised) {
 	if(!f ||!raw_depth) return;
 	
 	if(rgb != NULL) {
@@ -28,6 +28,7 @@ void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, 
 	}
 	fwrite(raw_depth,640*480*4,1,f);
 
+	fwrite(&rawtime,sizeof(time_t),1,f);
 	fwrite(&headx,sizeof(int),1,f);
 	fwrite(&heady,sizeof(int),1,f);
 	fwrite(&headz,sizeof(int),1,f);
@@ -39,6 +40,7 @@ void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, 
 	fwrite(&lefthandy,sizeof(int),1,f);
 	fwrite(&righthandx,sizeof(int),1,f);
 	fwrite(&righthandy,sizeof(int),1,f);
+	fwrite(&righthandraised,sizeof(bool),1,f);
 }
 
 void ofxKinectRecorder::close(){

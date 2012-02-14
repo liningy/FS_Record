@@ -83,10 +83,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="button.cpp" />
+    <ClCompile Include="conference.cpp" />
     <ClCompile Include="grabVideo.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ofxKinectPlayer.cpp" />
     <ClCompile Include="ofxKinectRecorder.cpp" />
+    <ClCompile Include="slider.cpp" />
     <ClCompile Include="src\addons\ofxFBOTexture.cpp" />
     <ClCompile Include="src\addons\ofxShader.cpp" />
     <ClCompile Include="src\examples\shaderBlur.cpp" />
@@ -94,12 +97,15 @@
     <ClCompile Include="testApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="button.h" />
+    <ClInclude Include="conference.h" />
     <ClInclude Include="eventsObject.h" />
     <ClInclude Include="grabVideo.h" />
     <ClInclude Include="ofxBase3DVideo.h" />
     <ClInclude Include="ofxKinectPlayer.h" />
     <ClInclude Include="ofxKinectRecorder.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="slider.h" />
     <ClInclude Include="src\addons\ofxFBOTexture.h" />
     <ClInclude Include="src\addons\ofxShader.h" />
     <ClInclude Include="src\examples\shaderBlur.h" />

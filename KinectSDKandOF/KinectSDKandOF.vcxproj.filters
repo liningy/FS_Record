@@ -47,10 +47,19 @@
     <ClCompile Include="testApp.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="button.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="conference.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="ofxKinectPlayer.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="ofxKinectRecorder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="slider.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -82,13 +91,22 @@
     <ClInclude Include="grabVideo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="button.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="conference.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ofxBase3DVideo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ofxKinectPlayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ofxKinectRecorder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ofxBase3DVideo.h">
+    <ClInclude Include="slider.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
