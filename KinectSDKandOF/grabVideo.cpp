@@ -8,8 +8,6 @@
 #include "grabVideo.h"
 #include "MSR_NuiApi.h"
 
-// For CLSID_CMSRKinectAudio GUID
-#include "MSRKinectAudio.h"
 
 
 #define SAFE_ARRAYDELETE(p) {if (p) delete[] (p); (p) = NULL;}
@@ -20,53 +18,15 @@
 #define CHECK_ALLOC(pb, message) if (NULL == pb) { puts(message); goto exit;}
 #define CHECK_BOOL(b, message) if (!b) { hr = E_FAIL; puts(message); goto exit;}
 
-// store audio data in CStaticMediaBuffer
-class CStaticMediaBuffer : public IMediaBuffer {
-public:
-   CStaticMediaBuffer() {}
-   CStaticMediaBuffer(BYTE *pData, ULONG ulSize, ULONG ulData) :
-      m_pData(pData), m_ulSize(ulSize), m_ulData(ulData), m_cRef(1) {}
-   STDMETHODIMP_(ULONG) AddRef() { return 2; }
-   STDMETHODIMP_(ULONG) Release() { return 1; }
-   STDMETHODIMP QueryInterface(REFIID riid, void **ppv) {
-      if (riid == IID_IUnknown) {
-         AddRef();
-         *ppv = (IUnknown*)this;
-         return NOERROR;
-      }
-      else if (riid == IID_IMediaBuffer) {
-         AddRef();
-         *ppv = (IMediaBuffer*)this;
-         return NOERROR;
-      }
-      else
-         return E_NOINTERFACE;
-   }
-   STDMETHODIMP SetLength(DWORD ulLength) {m_ulData = ulLength; return NOERROR;}
-   STDMETHODIMP GetMaxLength(DWORD *pcbMaxLength) {*pcbMaxLength = m_ulSize; return NOERROR;}
-   STDMETHODIMP GetBufferAndLength(BYTE **ppBuffer, DWORD *pcbLength) {
-      if (ppBuffer) *ppBuffer = m_pData;
-      if (pcbLength) *pcbLength = m_ulData;
-      return NOERROR;
-   }
-   void Init(BYTE *pData, ULONG ulSize, ULONG ulData) {
-        m_pData = pData;
-        m_ulSize = ulSize;
-        m_ulData = ulData;
-    }
-protected:
-   BYTE *m_pData;
-   ULONG m_ulSize;
-   ULONG m_ulData;
-   ULONG m_cRef;
-};
-
-
 
 // Helper functions used to discover microphone array device
 HRESULT GetMicArrayDeviceIndex(int *piDeviceIndex);
 HRESULT GetJackSubtypeForEndpoint(IMMDevice* pEndpoint, GUID* pgSubtype);
 
+HRESULT DShowRecord();
+HRESULT WriteToFile(HANDLE hFile, void* p, DWORD cb);
+HRESULT WriteWaveHeader(HANDLE hFile, WAVEFORMATEX *pWav, DWORD *pcbWritten);
+HRESULT FixUpChunkSizes(HANDLE hFile, DWORD cbHeader, DWORD cbAudioData);
 // Takes in an x and y depth value, returns corresponding x and y  values of the color image
 void KinectGrabber::Kinect_ColorFromDepth(LONG depthX, LONG depthY, LONG *pColorX, LONG *pColorY) {
 	NuiImageGetColorPixelCoordinatesFromDepthPixel(NUI_IMAGE_RESOLUTION_640x480, NULL, LONG(depthX/2), LONG(depthY/2), m_depthBuffer[depthY*DEPTH_WIDTH + depthX] << 3, pColorX, pColorY); 
@@ -141,54 +101,12 @@ HRESULT KinectGrabber::Kinect_Init() {
     }
 	//return hr;
 
-	// audio initialization
-	minDiscrepancyIdx=7;  //when skeleton is detected, the number should be between 0 to 6. Set it to a random number beyond this range is OK
-	hr = S_OK;
-    CoInitialize(NULL);
-    int  iMicDevIdx = -1; 
-	int  iSpkDevIdx = 0;  //Asume default speakers
-    DWORD mmTaskIndex = 0;
-
-    // Set high priority to avoid getting preempted while capturing sound
-    mmHandle = AvSetMmThreadCharacteristics(L"Audio", &mmTaskIndex);
-    CHECK_BOOL(mmHandle != NULL, "failed to set thread priority\n");
-
-    // DMO initialization
-    CHECKHR(CoCreateInstance(CLSID_CMSRKinectAudio, NULL, CLSCTX_INPROC_SERVER, IID_IMediaObject, (void**)&pDMO));
-    CHECKHR(pDMO->QueryInterface(IID_IPropertyStore, (void**)&pPS));
-
-	// Set AEC-MicArray DMO system mode.
-    // This must be set for the DMO to work properly
-    PROPVARIANT pvSysMode;
-    PropVariantInit(&pvSysMode);
-    pvSysMode.vt = VT_I4;
-    //   SINGLE_CHANNEL_AEC = 0
-    //   OPTIBEAM_ARRAY_ONLY = 2
-    //   OPTIBEAM_ARRAY_AND_AEC = 4
-    //   SINGLE_CHANNEL_NSAGC = 5
-    pvSysMode.lVal = (LONG)(2);
-    CHECKHR(pPS->SetValue(MFPKEY_WMAAECMA_SYSTEM_MODE, pvSysMode));
-    PropVariantClear(&pvSysMode);
-
-	// Tell DMO which capture device to use (we're using whichever device is a microphone array).
-    // Default rendering device (speaker) will be used.
-    hr = GetMicArrayDeviceIndex(&iMicDevIdx);
-    CHECK_RET(hr, "Failed to find microphone array device. Make sure microphone array is properly installed.");
-    
-    PROPVARIANT pvDeviceId;
-    PropVariantInit(&pvDeviceId);
-    pvDeviceId.vt = VT_I4;
-	//Speaker index is the two high order bytes and the mic index the two low order ones
-    pvDeviceId.lVal = (unsigned long)(iSpkDevIdx<<16) | (unsigned long)(0x0000ffff & iMicDevIdx);
-    CHECKHR(pPS->SetValue(MFPKEY_WMAAECMA_DEVICE_INDEXES, pvDeviceId));
-    PropVariantClear(&pvDeviceId);
-
-    //puts("done with initializing kinect sensor, press any key to continue...");
-    //_getch();
+	
 
 
-	exit:
-    puts("Press any key to continue"); 
+
+	//audio init?
+
 
 	//init other added parameters
 	isSkeletonTracked=false;
@@ -234,8 +152,6 @@ void KinectGrabber::Kinect_UnInit( )
 
 int KinectGrabber::Kinect_Update()
 {
-	// Capture sound in microphone array while performing beam angle detection and echo cancellation
-	DShowRecord(pDMO, pPS);
 
     HANDLE                hEvents[3];
     int                    nEventIdx;
@@ -546,27 +462,78 @@ void KinectGrabber::getJointsPoints() {
 	//printf("unmodified: %d shifted: %d\n", m_playerJointDepth[3], m_playerJointDepth[3] >> 3 );	
 }
 
-//now has sound to pixel mapping
-HRESULT KinectGrabber::DShowRecord(IMediaObject* pDMO, IPropertyStore* pPS)
-{
-	ISoundSourceLocalizer* pSC = NULL;
-	HRESULT hr;
-	int  cTtlToGo = 0;
+void KinectGrabber::recordAudioInit() {
+	minDiscrepancyIdx=7;  //when skeleton is detected, the number should be between 0 to 6. Set it to a random number beyond this range is OK
+	HRESULT hr = S_OK;
+	int  iMicDevIdx = -1; 
+	int  iSpkDevIdx = 0;  //Asume default speakers
+	pDMO = NULL;  
+    pPS = NULL;
+    HANDLE mmHandle = NULL;
+    DWORD mmTaskIndex = 0;
+    szOutputFile = _T("data/sounds/out.wav");
+
+
+    // Set high priority to avoid getting preempted while capturing sound
+    mmHandle = AvSetMmThreadCharacteristics(L"Audio", &mmTaskIndex);
+    CHECK_BOOL(mmHandle != NULL, "failed to set thread priority\n");
+
+    // DMO initialization
+ 	CoCreateInstance(CLSID_CMSRKinectAudio, NULL, CLSCTX_INPROC_SERVER, IID_IMediaObject, (void**)&pDMO);
+ 	pDMO->QueryInterface(IID_IPropertyStore, (void**)&pPS);
+
+    // Set AEC-MicArray DMO system mode.
+    // This must be set for the DMO to work properly
+    PROPVARIANT pvSysMode;
+    PropVariantInit(&pvSysMode);
+    pvSysMode.vt = VT_I4;
+    //   SINGLE_CHANNEL_AEC = 0
+    //   OPTIBEAM_ARRAY_ONLY = 2
+    //   OPTIBEAM_ARRAY_AND_AEC = 4
+    //   SINGLE_CHANNEL_NSAGC = 5
+    pvSysMode.lVal = (LONG)(2);
+    CHECKHR(pPS->SetValue(MFPKEY_WMAAECMA_SYSTEM_MODE, pvSysMode));
+    PropVariantClear(&pvSysMode);
+
+    // Tell DMO which capture device to use (we're using whichever device is a microphone array).
+    // Default rendering device (speaker) will be used.
+	hr = GetMicArrayDeviceIndex(&iMicDevIdx);
+    CHECK_RET(hr, "Failed to find microphone array device. Make sure microphone array is properly installed.");
+    
+    PROPVARIANT pvDeviceId;
+    PropVariantInit(&pvDeviceId);
+    pvDeviceId.vt = VT_I4;
+	//Speaker index is the two high order bytes and the mic index the two low order ones
+    pvDeviceId.lVal = (unsigned long)(iSpkDevIdx<<16) | (unsigned long)(0x0000ffff & iMicDevIdx);
+    CHECKHR(	pPS->SetValue(MFPKEY_WMAAECMA_DEVICE_INDEXES, pvDeviceId););
+    PropVariantClear(&pvDeviceId);
+
 	
-    DWORD cOutputBufLen = 0;
-    BYTE *pbOutputBuffer = NULL;
 	
-    WAVEFORMATEX wfxOut = {WAVE_FORMAT_PCM, 1, 16000, 32000, 2, 16, 0};
-	CStaticMediaBuffer outputBuffer;
-    DMO_OUTPUT_DATA_BUFFER OutputBufferStruct = {0};
-    OutputBufferStruct.pBuffer = &outputBuffer;
+	exit:
+    // main loop to get mic output from the DMO
+    puts("\nMicArray is running \n");
+
+
+}
+
+void KinectGrabber::recordAudioStart(){
+
+	WAVEFORMATEX wfxOut = {WAVE_FORMAT_PCM, 1, 16000, 32000, 2, 16, 0};
+
+	pSC = NULL;
+
+    cOutputBufLen = 0;
+    pbOutputBuffer = NULL;
+
+	//OutputBufferStruct = {0};
+	OutputBufferStruct.pBuffer = &outputBuffer;
     DMO_MEDIA_TYPE mt = {0};
-	
-    ULONG cbProduced = 0;
-    DWORD dwStatus;
-	
+
+    cbProduced = 0;
+
     // Set DMO output format
-    hr = MoInitMediaType(&mt, sizeof(WAVEFORMATEX));
+    HRESULT hr = MoInitMediaType(&mt, sizeof(WAVEFORMATEX));
     CHECK_RET(hr, "MoInitMediaType failed");
     
     mt.majortype = MEDIATYPE_Audio;
@@ -576,7 +543,7 @@ HRESULT KinectGrabber::DShowRecord(IMediaObject* pDMO, IPropertyStore* pPS)
     mt.bTemporalCompression = FALSE;
     mt.formattype = FORMAT_WaveFormatEx;	
     memcpy(mt.pbFormat, &wfxOut, sizeof(WAVEFORMATEX));
-  
+    
     hr = pDMO->SetOutputType(0, &mt, 0); 
     CHECK_RET(hr, "SetOutputType failed");
     MoFreeMediaType(&mt);
@@ -599,54 +566,261 @@ HRESULT KinectGrabber::DShowRecord(IMediaObject* pDMO, IPropertyStore* pPS)
     cOutputBufLen = wfxOut.nSamplesPerSec * wfxOut.nBlockAlign;
     pbOutputBuffer = new BYTE[cOutputBufLen];
     CHECK_ALLOC (pbOutputBuffer, "out of memory.\n");
-	
-	DWORD written = 0;
-	int totalBytes = 0;
+
+	hFile = CreateFile(
+            szOutputFile,
+            GENERIC_WRITE,
+            FILE_SHARE_READ,
+            NULL,
+            CREATE_ALWAYS,
+            0,
+            NULL
+            );
+    if(hFile == INVALID_HANDLE_VALUE)
+	{		
+		_tprintf(_T("Could not open the output file: %s\n"), szOutputFile);
+		goto exit;
+	}
+
+	writtenWAVHeader = 0;
+	WriteWaveHeader(hFile, &wfxOut, &writtenWAVHeader);
+	totalBytesWritten = 0;
 	
 	hr = pDMO->QueryInterface(IID_ISoundSourceLocalizer, (void**)&pSC);
 	CHECK_RET (hr, "QueryInterface for IID_ISoundSourceLocalizer failed");
-	
-	double dBeamAngle, dAngle;	
-	
-    // main loop to get mic output from the DMO
-    do{
-		outputBuffer.Init((byte*)pbOutputBuffer, cOutputBufLen, 0);
-        OutputBufferStruct.dwStatus = 0;
-        hr = pDMO->ProcessOutput(0, 1, &OutputBufferStruct, &dwStatus);
-        CHECK_RET (hr, "ProcessOutput failed. You must be rendering sound through the speakers before you start recording in order to perform echo cancellation.");
-
-        // Obtain beam angle from ISoundSourceLocalizer afforded by microphone array
-		hr = pSC->GetBeam(&dBeamAngle);
-		double dConf;
-		hr = pSC->GetPosition(&dAngle, &dConf);
-		
-		if(SUCCEEDED(hr))
-		{
-			// Map the width sound angle to a pixel
-			soundPixel = max( min(640, (dAngle + 0.33) * VIDEO_WIDTH), 0);
-			printf("------------------------------------------\n");
-			printf(" sound \n");
-			printf("------------------------------------------\n");
-				printf("angle %f \n", dAngle);
-				printf("the pixel number corresponding to sound %f \n", soundPixel);
-			}
-
-        } while (OutputBufferStruct.dwStatus & DMO_OUTPUT_DATA_BUFFERF_INCOMPLETE);
-
 
 exit:
+	return;
+}
+
+void KinectGrabber::recordAudioEnd(){
+
+//	#pragma warning(pop)
+
+	FixUpChunkSizes(hFile, writtenWAVHeader, totalBytesWritten);
+	CloseHandle(hFile);
+
+
+
     SAFE_ARRAYDELETE(pbOutputBuffer);    
 	SAFE_RELEASE(pSC);
+	
+	DWORD dwRet = GetFullPathName(szOutputFile, (DWORD)ARRAYSIZE(szOutfileFullName), szOutfileFullName,NULL);
+	HRESULT hr;
+	CHECK_BOOL(dwRet != 0, "\nSound output could not be written");
+
+    _tprintf(_T("\nSound output was written to file: %s\n"),szOutfileFullName);
+exit:
+	return;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// DShowRecord
+//
+// Uses the DMO in source mode to retrieve clean audio samples and record
+// them to a .wav file.
+//
+///////////////////////////////////////////////////////////////////////////
+HRESULT KinectGrabber::DShowRecord()
+{
+HRESULT hr;
+//#pragma warning(push)
+//#pragma warning(disable: 4127) // conditional expression is constant
+
+    do{
+            outputBuffer.Init((byte*)pbOutputBuffer, cOutputBufLen, 0);
+            OutputBufferStruct.dwStatus = 0;
+            hr = pDMO->ProcessOutput(0, 1, &OutputBufferStruct, &dwStatus);
+            CHECK_RET (hr, "ProcessOutput failed. You must be rendering sound through the speakers before you start recording in order to perform echo cancellation.");
+
+            if (hr == S_FALSE) {
+                cbProduced = 0;
+            } else {
+                hr = outputBuffer.GetBufferAndLength(NULL, &cbProduced);
+                CHECK_RET (hr, "GetBufferAndLength failed");
+            }
+			
+			WriteToFile(hFile, pbOutputBuffer, cbProduced);
+			totalBytesWritten += cbProduced;
+
+            // Obtain beam angle from ISoundSourceLocalizer afforded by microphone array
+			hr = pSC->GetBeam(&dBeamAngle);
+			double dConf;
+			hr = pSC->GetPosition(&dAngle, &dConf);
+			if(SUCCEEDED(hr))
+			{								
+				
+				//Use a moving average to smooth this out
+				if(dConf>0.9)
+				{					
+					//_tprintf(_T("Position: %f\t\tConfidence: %f\t\tBeam Angle = %f\r"), dAngle, dConf, dBeamAngle);					
+					
+				// Map the width sound angle to a pixel
+				soundPixel = max( min(640, (dAngle + 0.33) * VIDEO_WIDTH), 0);
+				/*printf("------------------------------------------\n");
+				printf(" sound \n");
+				printf("------------------------------------------\n");
+				printf("angle %f \n", dAngle);
+				printf("the pixel number corresponding to sound %f \n", soundPixel);*/
+
+				}
+			}
+
+    } while (OutputBufferStruct.dwStatus & DMO_OUTPUT_DATA_BUFFERF_INCOMPLETE);
+		
+
+    
+	exit:
+    return hr;
+}
+
+	
+
+///////////////////////////////////////////////////////////////////////////
+// WriteWaveHeader
+//
+// Writes a WAVE file header placeholder that will be updated by
+// FixUpChunkSizes after recording is complete.
+//
+///////////////////////////////////////////////////////////////////////////
+HRESULT WriteWaveHeader(
+    HANDLE hFile,               // Output file.
+    WAVEFORMATEX *pWav,
+    DWORD *pcbWritten           // Receives the size of the header.    
+    )
+{
+    HRESULT hr = S_OK;
+    UINT32 cbFormat = sizeof(WAVEFORMATEX);
+	*pcbWritten = 0;       
+
+    // Write the 'RIFF' header and the start of the 'fmt ' chunk.
+
+    if (SUCCEEDED(hr))
+    {
+        DWORD header[] = { 
+            // RIFF header
+            FCC('RIFF'), 
+            0, 
+            FCC('WAVE'),  
+            // Start of 'fmt ' chunk
+            FCC('fmt '), 
+            cbFormat 
+        };
+
+        DWORD dataHeader[] = { FCC('data'), 0 };
+
+        hr = WriteToFile(hFile, header, sizeof(header));
+
+        // Write the WAVEFORMATEX structure.
+        if (SUCCEEDED(hr))
+        {
+            hr = WriteToFile(hFile, pWav, cbFormat);
+        }
+
+        // Write the start of the 'data' chunk
+
+        if (SUCCEEDED(hr))
+        {
+            hr = WriteToFile(hFile, dataHeader, sizeof(dataHeader));
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            *pcbWritten = sizeof(header) + cbFormat + sizeof(dataHeader);
+        }
+    }
 
     return hr;
 }
 
+
+///////////////////////////////////////////////////////////////////////////
+// FixUpChunkSizes
+//
+// Writes the file-size information into the WAVE file header.
+// Note that WAVE files use the RIFF file format. Each RIFF chunk has a
+// data size, and the RIFF header has a total file size.
+//
+///////////////////////////////////////////////////////////////////////////
+HRESULT FixUpChunkSizes(
+    HANDLE hFile,           // Output file.
+    DWORD cbHeader,         // Size of the 'fmt ' chuck.
+    DWORD cbAudioData       // Size of the 'data' chunk.
+    )
+{
+    HRESULT hr = S_OK;
+
+    LARGE_INTEGER ll;
+    ll.QuadPart = cbHeader - sizeof(DWORD);
+
+    if (0 == SetFilePointerEx(hFile, ll, NULL, FILE_BEGIN))
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    // Write the data size.
+
+    if (SUCCEEDED(hr))
+    {
+        hr = WriteToFile(hFile, &cbAudioData, sizeof(cbAudioData));
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        // Write the file size.
+        ll.QuadPart = sizeof(FOURCC);
+
+        if (0 == SetFilePointerEx(hFile, ll, NULL, FILE_BEGIN))
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        DWORD cbRiffFileSize = cbHeader + cbAudioData - 8;
+
+        // NOTE: The "size" field in the RIFF header does not include
+        // the first 8 bytes of the file. i.e., it is the size of the
+        // data that appears _after_ the size field.
+
+        hr = WriteToFile(hFile, &cbRiffFileSize, sizeof(cbRiffFileSize));
+    }
+
+    return hr;
+}
+
+HRESULT WriteToFile(HANDLE hFile, void* p, DWORD cb)
+{
+    DWORD cbWritten = 0;
+    HRESULT hr = S_OK;
+
+    BOOL bResult = WriteFile(hFile, p, cb, &cbWritten, NULL);
+    if (!bResult)
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+    }
+    return hr;
+}
+
+
+///////////////////////////////////////////////////////////////////////////
+// GetMicArrayDeviceIndex
+//
+// Obtain device index corresponding to microphone array device.
+//
+// Parameters: piDevice: [out] Index of microphone array device.
+//
+// Return: S_OK if successful
+//         Failure code otherwise (e.g.: if microphone array device is not found).
+//
+///////////////////////////////////////////////////////////////////////////////
 HRESULT GetMicArrayDeviceIndex(int *piDevice)
 {
     HRESULT hr = S_OK;
     UINT index, dwCount;
-    IMMDeviceEnumerator* spEnumerator;
-    IMMDeviceCollection* spEndpoints;
+    IMMDeviceEnumerator* spEnumerator = NULL;
+    IMMDeviceCollection* spEndpoints = NULL;
 
     *piDevice = -1;
 
@@ -680,6 +854,15 @@ exit:
     return hr;
 }
 
+
+///////////////////////////////////////////////////////////////////////////////
+// GetJackSubtypeForEndpoint
+//
+// Gets the subtype of the jack that the specified endpoint device is plugged
+// into.  E.g. if the endpoint is for an array mic, then we would expect the
+// subtype of the jack to be KSNODETYPE_MICROPHONE_ARRAY
+//
+///////////////////////////////////////////////////////////////////////////////
 HRESULT GetJackSubtypeForEndpoint(IMMDevice* pEndpoint, GUID* pgSubtype)
 {
     HRESULT hr = S_OK;
@@ -709,4 +892,4 @@ exit:
    SAFE_RELEASE(spJack);    
    SAFE_RELEASE(spJackAsPart);
    return hr;
-}
+}//GetJackSubtypeForEndpoint()

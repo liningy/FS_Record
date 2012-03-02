@@ -15,6 +15,8 @@ void testApp::setup(){
 	g_kinectGrabber.Kinect_Zero();
 	g_kinectGrabber.Kinect_Init();
 
+	//ofSoundStreamListDevices();
+	
 	// allocate memory for textures
 	texColorAlpha.allocate(VIDEO_WIDTH,VIDEO_HEIGHT,GL_RGBA);
 	texGray.allocate(DEPTH_WIDTH, DEPTH_HEIGHT,GL_RGBA); // gray depth texture; the lighter the gray color is, the closer the skeleton is to the Kinect
@@ -42,12 +44,14 @@ void testApp::setup(){
 	recordButtonActive = true;
 	goodIdeaButtonActive = false;
 	smallButtonActive = false;
+	smallGoodImg.loadImage("images\\r_small.png");
 	int hButtonOffset = 30;
 	stopButton = new button("Stop", VIDEO_WIDTH - stopButtonWidth - hButtonOffset , VIDEO_HEIGHT + 50 , stopButtonWidth, stopButtonHeight, stopButtonActive, "images\\r_stop.png", "images\\r_stop.png");
 	replayButton = new button("Replay", VIDEO_WIDTH - hButtonOffset, VIDEO_HEIGHT + 50, replayButtonWidth, replayButtonHeight, replayButtonActive, "images\\r_pause.png", "images\\r_replay.png",   VIDEO_WIDTH - 4 - hButtonOffset, VIDEO_HEIGHT + 55);
 	recordButton = new button("Record", VIDEO_WIDTH + replayButtonWidth - hButtonOffset, VIDEO_HEIGHT + 50 , recordButtonWidth, recordButtonHeight, recordButtonActive, "images\\r_record.png", "images\\r_record.png");
 	goodIdeaButton = new button("Good Idea", 0.25*VIDEO_WIDTH , 1.25*VIDEO_HEIGHT + 50 , goodIdeaButtonWidth, goodIdeaButtonHeight, goodIdeaButtonActive, "images\\r_good.png", "images\\r_good.png");
 	rhrIndex = 0;
+	maxNoIndices = 10;
 
 	timerWidth = VIDEO_WIDTH;
 	timerStartX = VIDEO_WIDTH/2;
@@ -67,6 +71,9 @@ void testApp::setup(){
 	nFramesValid = false;
 	skipToMode = false;
 	pOSlider = 0.0;
+
+	numRecordedFrames = 0;
+	g_kinectGrabber.recordAudioInit();
 }
 
 //--------------------------------------------------------------
@@ -76,7 +83,6 @@ void testApp::update(){
 		g_kinectGrabber.Kinect_Update();
 	}
 	else{
-		
 	}
     if (bPlayback){//if bPlayback
 		if(!paused){//while paused we can't search for playback range
@@ -97,13 +103,18 @@ void testApp::update(){
 				leftHandPY =       rgbdepthpair.second.second.second.second.second.second.second.second.second.second.second.first;
 				rightHandPX =      rgbdepthpair.second.second.second.second.second.second.second.second.second.second.second.second.first;
 				rightHandPY =	   rgbdepthpair.second.second.second.second.second.second.second.second.second.second.second.second.second.first;
+				if (!soundfile.getIsPlaying()) {
+					soundfile.play();
+				}
 			}
 			else if (skipToMode){
 				skipTo(pOSlider);
 			}
+			/*
 			else{//I put this last because I assumed people would skip more than start videos in sessions
 				getPlaybackRange();
-			}
+				
+			}*/
 			if (nFramesValid){//if you don't want slider updated during skipToMode, modify this (add && !skipToMode)
 				currFrame = (currFrame+1) % nFrames;
 				if(!skipToMode){
@@ -150,7 +161,14 @@ void testApp::update(){
 	USHORT* depthBuff = g_kinectGrabber.Kinect_getDepthBuffer();
 
 	if(bRecord){// && kinectRecorder.isOpened()) {
+	  nFrames++;
 	  kinectRecorder.newFrame(colorAlphaPixels, grayPixels, rawTime, headPositionX, headPositionY, headPositionZ, leftShoulderX, leftShoulderY, rightShoulderX, rightShoulderY,leftHandPX, leftHandPY, rightHandPX, rightHandPY, rightHandUp);
+	  numRecordedFrames ++;
+	  if (rightHandUp){//if there are more kinds of gestures and audio, send all of them together at end (otherwise, order will get mixed up I believe)
+			kinectRecorder.storeInt(nFrames,false);
+		}
+	  g_kinectGrabber.DShowRecord();
+	
 	}
 }
 
@@ -181,23 +199,32 @@ void testApp::draw(){
 		(*replayButton).drawFont(replayButtonActive, pauseButtonOn);
 		(*recordButton).drawFont(recordButtonActive);
 		(*goodIdeaButton).drawFont(goodIdeaButtonActive);
-		(*timer).drawSlider(timerStartX, timerStartX + timerWidth);//unsure what the variables do!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		(*timer).drawSlider(0, 1);//unsure what the variables do!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if ((playbackRangeSearchOn) || (skipToMode)){
 			ofDrawBitmapString ("Loading...", timerStartX, timerStartY + 50);
 		}
 		if (rightHandUp){
 			ofCircle(60,VIDEO_HEIGHT - 20,20);
 		}
+
 		if (smallButtonActive && nFramesValid){	// nFramesValid should imply playback
-			for (int i = 0;i<rhrIndex;i++){
-				if (smallRHRLocations[i] !=NULL){//TODO: should be modified to be generalizable
+			for (int i = 0;i<maxNoIndices;i++){
+				if (smallRHRLocations[i] !=0){//TODO: should be modified to be generalizable
 					//tempSS << "smallGood" << smallRHRLocations[i];
 					//tempS = tempSS.str();
 					tempButtonX = (int) ((float) timerStartX + ((float) smallRHRLocations[i]/(float) nFrames)*timerWidth);
-					(button("smallGood", tempButtonX, timerStartY + 15, 22, 25, smallButtonActive, "images\\r_small.png", "images\\r_small.png")).drawFont(true);
+					//button("smallGood", tempButtonX, timerStartY + 15, 22, 25, smallButtonActive, "images\\r_small.png", "images\\r_small.png")).drawFont(true);
+					smallGoodImg.draw(tempButtonX,timerStartY +15);
 				}
 			}
-		}
+		}	
+
+	printf("numRecordedFrames=");
+	printf("%i", numRecordedFrames);
+	printf("/n");
+	printf("nFrames=");
+	printf("%i",nFrames);
+	printf("/n");
 }
 //-------------------------------------------------------------
 void testApp::exit(){
@@ -287,20 +314,37 @@ void testApp::windowResized(int w, int h){
 /// using the same file!!!
 
 void testApp::startRecording() {
+	numRecordedFrames = 0;
 	stopPlayback(); // stop playback if recording
-	kinectRecorder.init(ofToDataPath("recording.dat"));
+	kinectRecorder.init(ofToDataPath("recording.dat"), ofToDataPath("recordingInfo.dat"));
 	bRecord = true;
+
+	g_kinectGrabber.recordAudioStart();
+	startRecordTime = ofGetElapsedTimeMillis();
 }
 
+
 void testApp::stopRecording() {
-	kinectRecorder.close();
 	bRecord = false;
+	if (nFrames != 0) { //without this, nFrames in recordingInfo would be overwritten with 0 when playback started (since it stops recording first)
+		kinectRecorder.storeInt(nFrames, true);
+	}
+	kinectRecorder.close();
 	safeResetLiveMode();
+
+	//audio
+	g_kinectGrabber.recordAudioEnd();
+	stopRecordTime = ofGetElapsedTimeMillis();
+	videoFrameDelay = (stopRecordTime - startRecordTime)/numRecordedFrames;
+	//videoFrameDelay = (stopRecordTime - startRecordTime)/nFrames;
+
 }
 
 void testApp::startPlayback() {
+	
+
 	stopRecording(); //stop recording if starting playback
-	kinectPlayer.setup(ofToDataPath("recording.dat"), true); // set record file and source
+	kinectPlayer.setup(ofToDataPath("recording.dat"), ofToDataPath("recordingInfo.dat"), true); // set record file and source
 	kinectPlayer.loop();
 	bPlayback = true;
 	rightHandUpCount = 0; //reset right hand up count
@@ -309,6 +353,8 @@ void testApp::startPlayback() {
 		standardReplay();
 	}
 	play();
+
+	soundfile.loadSound("sounds/out.wav");
 }
 
 void testApp::stopPlayback() {
@@ -317,6 +363,9 @@ void testApp::stopPlayback() {
 	rightHandUpCount = 0; //reset right hand up count
 	nFramesValid = false;
 	safeResetLiveMode();
+
+	soundfile.stop();
+
 }
 
 //PLAYBACK HELPER FUNCTIONS
@@ -373,8 +422,26 @@ void testApp::interruptFastPlayback(){
 		pOSlider = 0.0;
 	}
 }
+
+
 /////function to get the number of frames (and where each type of gesture is)
+//2 (one of the more important changes)
 void testApp::getPlaybackRange(){ 
+	frameInfo = kinectPlayer.updateInt();
+	nFrames =					frameInfo.first;
+	smallRHRLocations[0] =		frameInfo.second.first;
+	smallRHRLocations[1] =		frameInfo.second.second.first;
+	smallRHRLocations[2] =		frameInfo.second.second.second.first;
+	smallRHRLocations[3] =		frameInfo.second.second.second.second.first;
+	smallRHRLocations[4] =		frameInfo.second.second.second.second.second.first;
+	smallRHRLocations[5] =		frameInfo.second.second.second.second.second.second.first;
+	smallRHRLocations[6] =		frameInfo.second.second.second.second.second.second.second.first;
+	smallRHRLocations[7] =		frameInfo.second.second.second.second.second.second.second.second.first;
+	smallRHRLocations[8] =		frameInfo.second.second.second.second.second.second.second.second.second.first;
+	smallRHRLocations[9] =		frameInfo.second.second.second.second.second.second.second.second.second.second;
+	nFramesValid = true;
+	//2
+	/*
 	if (nFrames == 1){
 		if (rightHandUp){//before nFrames++ because this is the value for the prevFrame (nFrames is ahead by 1)
 			smallRHRLocations[rhrIndex] = nFrames;
@@ -407,6 +474,7 @@ void testApp::getPlaybackRange(){
 		playbackRangeSearchOn = false;
 		interruptFastPlayback();
 	}
+	*/
 }
 
 void testApp::skipTo(float percentOfSlider){//if user pauses or stops, skipTo should be reset to true and regular playback should resume
@@ -420,6 +488,10 @@ void testApp::skipTo(float percentOfSlider){//if user pauses or stops, skipTo sh
 		skipToMode = true;
 		updateDelay = true;
 		pOSlider = percentOfSlider;
+		
+		soundfile.stop();
+		printf("percent %f \n", percentOfSlider);
+		currSoundPos = percentOfSlider;
 	}
 	else{
 		printf("error in skip function");//maybe remove this. May help with debugging
@@ -480,11 +552,17 @@ void testApp::standardReplay(){
 				pause();
 				pauseButtonOn = false;
 				interruptFastPlayback();
+				if (soundfile.getIsPlaying()) {
+					currSoundPos = soundfile.getPosition();
+				}
+				soundfile.stop();
 			}
 			else if (paused){
 				play();
 				pauseButtonOn = true;
 				interruptFastPlayback();
+				soundfile.play();
+				soundfile.setPosition(currSoundPos);
 			}
 		}
 		updateButtonTriggers();

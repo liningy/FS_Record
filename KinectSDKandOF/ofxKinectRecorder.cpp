@@ -9,15 +9,20 @@
 
 ofxKinectRecorder::ofxKinectRecorder() {
 	f=NULL;
-
+	fInt=NULL;
 }
 
 ofxKinectRecorder::~ofxKinectRecorder() {
 	// TODO Auto-generated destructor stub
 }
 
-void ofxKinectRecorder::init(const string & filename){
+void ofxKinectRecorder::init(const string & filename, const string & filenameInt){
 	f = fopen(ofToDataPath(filename).c_str(),"wb");
+
+	fInt = fopen(ofToDataPath(filenameInt).c_str(),"wb");
+	maxNoIndices = 10;
+	indexCount = 0;
+	negOne = -1;//default value to be written on unused index positions
 }
 
 void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, time_t rawtime, int headx, int heady, int headz, int leftshoulderx, int leftshouldery, int rightshoulderx, int rightshouldery, int lefthandx, int lefthandy, int righthandx, int righthandy, bool righthandraised) {
@@ -43,10 +48,38 @@ void ofxKinectRecorder::newFrame(unsigned char* rgb, unsigned char * raw_depth, 
 	fwrite(&righthandraised,sizeof(bool),1,f);
 }
 
+void ofxKinectRecorder::storeInt(int frameNo, bool endOfRecording){
+	if (!fInt) return;
+	if(frameNo || frameNo == 0){
+		if (endOfRecording){
+			while(indexCount<maxNoIndices){//if end of frame but still haven't recorded maxNoIndices, then record a bunch of negative ones
+				fwrite(&negOne,sizeof(int),1,fInt);
+				indexCount++;
+			}
+			indexCount = 0;
+			fwrite(&frameNo,sizeof(int),1,fInt);
+		}
+		else if (indexCount<maxNoIndices){
+				fwrite(&frameNo,sizeof(int),1,fInt);
+				indexCount++;
+		}
+		else{
+			printf("error in record information storage");
+		}
+	}
+}
 void ofxKinectRecorder::close(){
-	if(!f) return;
-	fclose(f);
-	f=0;
+	if(f){
+		fclose(f);
+		f=0;
+	}
+	if(fInt){
+		fclose(fInt);
+		fInt=0;
+	}
+	maxNoIndices = 10;
+	indexCount = 0;
+	int negOne = -1;
 }
 
 bool ofxKinectRecorder::isOpened(){

@@ -12,6 +12,7 @@
 #include "button.h"
 #include "slider.h"
 #include <sstream> //suggestion from from not so frequently asked questions faq && stackoverflow
+#include "ofSoundStream.h"
 
 class testApp : public ofBaseApp{
 	
@@ -48,6 +49,15 @@ class testApp : public ofBaseApp{
 		void play()  {paused = false;} //sets paused = false (undos the pause effect stated above)
 		/////Gesture Checks
 		bool rightHandRaised(); //checks whether the right hand of the skeleton we are tracking is currently raised (returns true if it is)
+
+		//sound recording
+		ofSoundPlayer  soundfile;
+		int startRecordTime;
+		int stopRecordTime;
+		int videoFrameDelay;
+		int numRecordedFrames;
+		float currSoundPos;
+
 		//======================================================================
 		//BUTTON CONTROL SECTION
 		//these three do the actions of the buttons safely (updating what needs to be updated, etc) 
@@ -76,6 +86,10 @@ class testApp : public ofBaseApp{
 		ofxKinectPlayer 	kinectPlayer; //reads variables off of a file and returns the variables
 		pair<unsigned char *,pair<unsigned char *,pair<time_t,pair<int,pair<int,pair<int,pair<int,
 			pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,pair<int,bool>>>>>>>>>>>>>> rgbdepthpair;//variable that accepts the variables that kinectPlayer sends
+
+		pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int,
+			pair<int, int>>>>>>>>>> frameInfo;//variable that accepts the variables that kinectPlayerInfo sends (nFrames and gesture audio indices)
+
 		/////Gesture
 		bool rightHandUp; // is true if the skeleton's right hand is raised for at least 20 frames
 		int rightHandUpCount; //counts the number of frames that right hand has been up. resets every 100 frames
@@ -111,8 +125,10 @@ class testApp : public ofBaseApp{
 		bool goodIdeaButtonActive;
 		bool smallButtonActive;
 		///// Small Button variables
+		ofImage smallGoodImg;
 		int smallRHRLocations[20];//the frame numbers of up to 20 locations on the slider at which small right hand raised buttons should be (stores the last 20)
 		int rhrIndex; //the index of the index after the last currently  filled slot in the small RHRLocations array
+		int maxNoIndices; //the max of each kind of gesture of audio allowable
 		std::stringstream tempSS;// intermediate variable to convert an int to a string (since each button should have a different name)
 		std::string tempS;// variable to hold small button name
 		int tempButtonX;
@@ -133,6 +149,7 @@ class testApp : public ofBaseApp{
 		time_t prevTimeMillis; //timestap of the previous frame that you saw
 		bool skipToMode; //whether we're currently skipping to a point in the video or not
 		float pOSlider; //global variable to store what percent of the slider we want to be at
+		int rhrFrame1, rhrFrame2, rhrFrame3, rhrFrame4, rhrFrame5, rhrFrame6, rhrFrame7, rhrFrame8, rhrFrame9, rhrFrame10;
 };
 
 #endif

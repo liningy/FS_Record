@@ -39,9 +39,11 @@ void ofxKinectPlayer::setUseTexture(bool _bUseTexture){
 }
 
 //-----------------------------------------------------------
-void ofxKinectPlayer::setup(const string & file, bool video){
+void ofxKinectPlayer::setup(const string & file, const string & fileInt, bool video){
 	f = fopen(ofToDataPath(file).c_str(), "rb");
 	filename = file;
+	fInt = fopen(ofToDataPath(fileInt).c_str(), "rb");
+	filenameInt = fileInt;
 	//if(!buf) buf 		= new uint16_t[640*480];
 	if(!buf) buf = new unsigned char[640*480*4];
 	if(!rgb) rgb = new unsigned char[640*480*4];
@@ -63,8 +65,9 @@ pair<unsigned char *,pair<unsigned char *,pair<time_t,pair<int,pair<int,pair<int
 	if(!f){
 		printf("error!");
 	}
+	
 	if (updateDelay){
-		while((ofGetElapsedTimeMillis()-lastFrameTime)<(1000./float(fps)))	
+		while((ofGetElapsedTimeMillis()-lastFrameTime)<(1000./float(fps)))		
 		{}
 	}
 	lastFrameTime = ofGetElapsedTimeMillis();
@@ -98,6 +101,29 @@ pair<unsigned char *,pair<unsigned char *,pair<time_t,pair<int,pair<int,pair<int
 	}
 	printf("error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 	return make_pair(rgb,make_pair(buf,make_pair(rawTime,make_pair(headx,make_pair(heady,make_pair(headz,make_pair(leftshoulderx,make_pair(leftshouldery,make_pair(rightshoulderx,make_pair(rightshouldery,make_pair(lefthandx,make_pair(lefthandy,make_pair(righthandx,make_pair(righthandy,righthandraised))))))))))))));
+}
+
+//-----------------------------------------------------------
+pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, pair<int, int>>>>>>>>>> ofxKinectPlayer::updateInt(){
+	if(!fInt){
+		printf("error!");
+	}
+	fread(&rhrFrame1,sizeof(int),1,fInt);
+	fread(&rhrFrame2,sizeof(int),1,fInt);
+	fread(&rhrFrame3,sizeof(int),1,fInt);
+	fread(&rhrFrame4,sizeof(int),1,fInt);
+	fread(&rhrFrame5,sizeof(int),1,fInt);
+	fread(&rhrFrame6,sizeof(int),1,fInt);
+	fread(&rhrFrame7,sizeof(int),1,fInt);
+	fread(&rhrFrame8,sizeof(int),1,fInt);
+	fread(&rhrFrame9,sizeof(int),1,fInt);
+	fread(&rhrFrame10,sizeof(int),1,fInt);
+	fread(&nFrames,sizeof(int),1,fInt);
+	// loop?
+	if(bLoop && std::feof(fInt) > 0) {
+		fInt = fopen(ofToDataPath(filenameInt).c_str(), "rb");
+	}
+	return make_pair(nFrames,make_pair(rhrFrame1,make_pair(rhrFrame2,make_pair(rhrFrame3,make_pair(rhrFrame4,make_pair(rhrFrame5,make_pair(rhrFrame6,make_pair(rhrFrame7,make_pair(rhrFrame8,make_pair(rhrFrame9,rhrFrame10))))))))));
 }
 //-----------------------------------------------------------
 void ofxKinectPlayer::draw(float x, float y){

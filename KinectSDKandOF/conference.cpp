@@ -245,7 +245,7 @@ void focusRGB_manualLocked(BYTE* videoBuff, USHORT* depthBuff, BYTE * focusBuff,
 
 
 /*
-//creat transition between 0 to 255, not used anymore
+//create transition between 0 to 255, not used anymore
 void adjustOver(int range, BYTE * overBuff) {
 	BYTE * new_alpha_buff;
 	new_alpha_buff = (BYTE*) malloc (DEPTH_WIDTH*DEPTH_HEIGHT*sizeof(BYTE));

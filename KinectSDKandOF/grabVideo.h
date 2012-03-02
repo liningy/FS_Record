@@ -14,13 +14,66 @@
 #include <uuids.h> // FORMAT_WaveFormatEx and such
 #include <mfapi.h> // FCC
 
+// For configuring DMO properties
+#include <wmcodecdsp.h>
+// For discovering microphone array device
+#include <MMDeviceApi.h>
+
+
+
 #include "resource.h"
+
+// For CLSID_CMSRKinectAudio GUID
+#include "MSRKinectAudio.h"
 
 const int VIDEO_WIDTH = 640;
 const int VIDEO_HEIGHT= 480;
 const int DEPTH_WIDTH = 640;
 const int DEPTH_HEIGHT= 480;
 #define NUI_SKELETON_COUNT 6
+
+
+// store audio data in CStaticMediaBuffer
+class CStaticMediaBuffer : public IMediaBuffer {
+public:
+   CStaticMediaBuffer() {}
+   CStaticMediaBuffer(BYTE *pData, ULONG ulSize, ULONG ulData) :
+      m_pData(pData), m_ulSize(ulSize), m_ulData(ulData), m_cRef(1) {}
+   STDMETHODIMP_(ULONG) AddRef() { return 2; }
+   STDMETHODIMP_(ULONG) Release() { return 1; }
+   STDMETHODIMP QueryInterface(REFIID riid, void **ppv) {
+      if (riid == IID_IUnknown) {
+         AddRef();
+         *ppv = (IUnknown*)this;
+         return NOERROR;
+      }
+      else if (riid == IID_IMediaBuffer) {
+         AddRef();
+         *ppv = (IMediaBuffer*)this;
+         return NOERROR;
+      }
+      else
+         return E_NOINTERFACE;
+   }
+   STDMETHODIMP SetLength(DWORD ulLength) {m_ulData = ulLength; return NOERROR;}
+   STDMETHODIMP GetMaxLength(DWORD *pcbMaxLength) {*pcbMaxLength = m_ulSize; return NOERROR;}
+   STDMETHODIMP GetBufferAndLength(BYTE **ppBuffer, DWORD *pcbLength) {
+      if (ppBuffer) *ppBuffer = m_pData;
+      if (pcbLength) *pcbLength = m_ulData;
+      return NOERROR;
+   }
+   void Init(BYTE *pData, ULONG ulSize, ULONG ulData) {
+        m_pData = pData;
+        m_ulSize = ulSize;
+        m_ulData = ulData;
+    }
+protected:
+   BYTE *m_pData;
+   ULONG m_ulSize;
+   ULONG m_ulData;
+   ULONG m_cRef;
+};
+
 
 
 class KinectGrabber{
@@ -30,14 +83,14 @@ public:
 	// Sensor Initialization and Update
 	////////////////////////////////////////////////////////////////////////
     HRESULT					Kinect_Init();
-    void                    Kinect_UnInit( );
+    void                    Kinect_UnInit();
 	void                    Kinect_Zero();
 	int						Kinect_Update();
     void                    Kinect_GotVideoAlert( );
 	void                    Kinect_GotDepthAlert( );
     void                    Kinect_GotSkeletonAlert( );
-
 	
+
 	////////////////////////////////////////////////////////////////////////
 	// Pixel Buffers
 	////////////////////////////////////////////////////////////////////////
@@ -52,18 +105,33 @@ public:
 	////////////////////////////////////////////////////////////////////////
 	// Audio
 	////////////////////////////////////////////////////////////////////////
-	HRESULT					DShowRecord(IMediaObject* pDMO, IPropertyStore* pPS); // samples audio and reads out the location
+	HRESULT					DShowRecord(); // samples audio and reads out the location
 	double soundPixel;                                                            // Pixel approximation of the source of audio. (x dimention)
 	int minDiscrepancyIdx;                                                        // Index of the tracked skeleton that most closely machtes the audio.
 
-	
+	void						recordAudioStart();
+	void						recordAudioInit();
+	void						recordAudioEnd();
+	LPCTSTR szOutputFile;
+	TCHAR szOutfileFullName[MAX_PATH];
+	HANDLE hFile;
+	DWORD writtenWAVHeader;
+	int totalBytesWritten;
+	CStaticMediaBuffer outputBuffer;
+    ISoundSourceLocalizer* pSC;
+	DWORD cOutputBufLen;
+    BYTE *pbOutputBuffer;
+	DMO_OUTPUT_DATA_BUFFER OutputBufferStruct;
+	ULONG cbProduced;
+	DWORD dwStatus;
+
 	////////////////////////////////////////////////////////////////////////
 	//Skeleton tracking
 	////////////////////////////////////////////////////////////////////////
 	void			getJointsPoints();
 	void			Kinect_ColorFromDepth(LONG depthX, LONG depthY, LONG *pColorX, LONG *pColorY);
 	bool            isSkeletonTracked; //flag to indicate if there are skeletons being tracked
-	
+
 	// Joint location data for last tracked player
 	int           headJoints_x;
 	int           headJoints_y;

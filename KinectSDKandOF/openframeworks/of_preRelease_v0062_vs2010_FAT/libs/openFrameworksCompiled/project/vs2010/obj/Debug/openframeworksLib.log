@@ -1,1 +1,17 @@
-﻿  openframeworksLib.vcxproj -> C:\Users\liningy\KinectedConference\KinectSDKandOF\openframeworks\of_preRelease_v0062_vs2010_FAT\libs\openFrameworksCompiled\project\vs2010\..\..\lib\vs2010\openframeworksLibDebug.lib
+﻿Build started 3/1/2012 8:53:05 PM.
+     1>Project "C:\Users\liningy\FS_Record\KinectSDKandOF\openframeworks\of_preRelease_v0062_vs2010_FAT\libs\openFrameworksCompiled\project\vs2010\openframeworksLib.vcxproj" on node 2 (build target(s)).
+     1>InitializeBuildStatus:
+         Creating "obj\Debug\openframeworksLib.unsuccessfulbuild" because "AlwaysCreate" was specified.
+       ClCompile:
+         All outputs are up-to-date.
+       Lib:
+         All outputs are up-to-date.
+         openframeworksLib.vcxproj -> C:\Users\liningy\FS_Record\KinectSDKandOF\openframeworks\of_preRelease_v0062_vs2010_FAT\libs\openFrameworksCompiled\project\vs2010\..\..\lib\vs2010\openframeworksLibDebug.lib
+       FinalizeBuildStatus:
+         Deleting file "obj\Debug\openframeworksLib.unsuccessfulbuild".
+         Touching "obj\Debug\openframeworksLib.lastbuildstate".
+     1>Done Building Project "C:\Users\liningy\FS_Record\KinectSDKandOF\openframeworks\of_preRelease_v0062_vs2010_FAT\libs\openFrameworksCompiled\project\vs2010\openframeworksLib.vcxproj" (build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:00.06
